@@ -1,9 +1,15 @@
 #include "user.h"
 
+static inline uint64 __rdtscp(void) {
+	uint32 hi, lo;
+	__asm__ __volatile__ ("rdtscp" : "=a"(lo), "=d"(hi) :: "%rcx");
+	return ( (uint64)lo)|( ((uint64)hi)<<32 );
+}
+
 int main(int argc, char *argv[]) {
 	uint64 delta, time;
 
-	time = __builtin_ia32_rdtsc();
+	time = __rdtscp();
 
 	if (fork()) {
 		/* parent */
@@ -16,10 +22,10 @@ int main(int argc, char *argv[]) {
 			exec(argv[1], argv + 2);
 	}
 
-	delta = __builtin_ia32_rdtsc() - time;
+	delta = __rdtscp() - time;
 
 	/* stdout = 1 */
-	printf(1, "%s took %d cycles to run.\n", argv[1], delta);
+	printf(1, "%s took %u cycles to run.\n", argv[1], delta);
 
 	exit();
 }

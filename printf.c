@@ -28,7 +28,7 @@ print_x32(int fd, uint x)
     putc(fd, digits[x >> (sizeof(uint) * 8 - 4)]);
 }
 
-  static void
+static void
 print_d(int fd, int v)
 {
   char buf[16];
@@ -49,6 +49,23 @@ print_d(int fd, int v)
   while (--i >= 0)
     putc(fd, buf[i]);
 }
+
+static void
+print_u(int fd, int v)
+{
+  char buf[16];
+  uint64 x = v;
+
+  int i = 0;
+  do {
+    buf[i++] = digits[x % 10];
+    x /= 10;
+  } while(x != 0);
+
+  while (--i >= 0)
+    putc(fd, buf[i]);
+}
+
 // Print to the given fd. Only understands %d, %x, %p, %s.
   void
 printf(int fd, char *fmt, ...)
@@ -71,6 +88,9 @@ printf(int fd, char *fmt, ...)
       putc(fd, va_arg(ap, int));
       break;
     case 'd':
+      print_d(fd, va_arg(ap, int));
+      break;
+    case 'u':
       print_d(fd, va_arg(ap, int));
       break;
     case 'x':
