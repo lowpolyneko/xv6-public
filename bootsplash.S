@@ -39,8 +39,31 @@ start:
 	lea dap,		%si # offset
 	int $0x13
 
-stop:
-	jmp stop
+color_change:
+	movb $0,		%ah # wait for keypress
+	int $0x16
+
+	movb (color),		%al
+	test %al,		%al
+	jnz white
+	mov $0x1010,		%ax # change palette color
+	mov $0xf,		%bx # change 15 (foreground)
+	mov $0,			%dh # i like blue :D
+	mov $0,			%ch
+	mov $255,		%cl
+	int $0x10
+
+	movb $1,		(color) # set toggle
+	jmp color_change
+white:
+	mov $0x1010,		%ax
+	mov $0xf,		%bx # change 15 (foreground)
+	mov $255,		%dh # r
+	mov $255,		%ch # g
+	mov $255,		%cl # b
+	int $0x10
+	movb $0,		(color) # set toggle
+	jmp color_change
 
 hello:
 	.string "Welcome to xv6@UIC. Press any key to continue"
@@ -48,6 +71,9 @@ hello:
 
 drive:
 	.byte 0x0	# save drive
+
+color:
+	.byte 0x0	# color
 
 dap:
 	.byte 0x10	# size
