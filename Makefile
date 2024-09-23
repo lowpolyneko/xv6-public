@@ -227,7 +227,7 @@ bootsplash.img: bootsplash.S cover.raw
 	$(AS) bootsplash.S -o bootsplash.o
 	$(LD) -Ttext=0x7c00 -e start bootsplash.o -o bootsplashlinked.o
 	$(OBJCOPY) -O binary bootsplashlinked.o bootsplash.img
-	dd if=cover.raw of=bootsplash.img seek=1
+	dd if=cover.raw of=bootsplash.img seek=1 conv=notrunc
 
 
 bootskel.img: bootskel.S
