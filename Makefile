@@ -132,6 +132,7 @@ clean:
 	*.o *.d *.asm *.sym vectors.S bootblock entryother \
 	initcode initcode.out kernel xv6.img fs.img kernelmemfs mkfs \
 	.gdbinit \
+	bootsplash.img bootskel.img \
 	_*
 
 # make a printout
@@ -221,6 +222,12 @@ tar:
 	mkdir -p /tmp/xv6
 	cp dist/* dist/.gdbinit.tmpl /tmp/xv6
 	(cd /tmp; tar cf - xv6) | gzip >xv6-rev10.tar.gz  # the next one will be 10 (9/17)
+
+bootsplash.img: bootsplash.S cover.raw
+	$(AS) bootsplash.S -o bootsplash.o
+	$(LD) -Ttext=0x7c00 -e start bootsplash.o -o bootsplashlinked.o
+	$(OBJCOPY) -O binary bootsplashlinked.o bootsplash.img
+	dd if=cover.raw of=bootsplash.img seek=1
 
 
 bootskel.img: bootskel.S
