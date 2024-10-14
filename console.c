@@ -148,7 +148,7 @@ panic(char *s)
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
-  static void
+static void
 cgaputc(int c)
 {
   int pos;
@@ -179,7 +179,55 @@ cgaputc(int c)
   crt[pos] = ' ' | 0x0700;
 }
 
-  void
+static void
+cgaputc_color(int c, unsigned char fg, unsigned char bg)
+{
+  int pos;
+
+  // Cursor position: col + 80*row.
+  outb(CRTPORT, 14);
+  pos = inb(CRTPORT+1) << 8;
+  outb(CRTPORT, 15);
+  pos |= inb(CRTPORT+1);
+
+  if (c == '\n')
+    pos += 80 - pos%80;
+  else if (c == BACKSPACE) {
+    if (pos > 0) --pos;
+  } else {
+    crt[pos++] = (c&0xff) | fg << 8 | bg;  // fg then bg
+  }
+
+  if ((pos/80) >= 24){  // Scroll up.
+    memmove(crt, crt+80, sizeof(crt[0])*23*80);
+    pos -= 80;
+    memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
+  }
+
+  outb(CRTPORT, 14);
+  outb(CRTPORT+1, pos>>8);
+  outb(CRTPORT, 15);
+  outb(CRTPORT+1, pos);
+  crt[pos] = ' ' | 0x0700;
+}
+
+void
+consputc_color(int c, unsigned char fg, unsigned char bg)
+{
+  if (panicked) {
+    cli();
+    for(;;)
+      hlt();
+  }
+
+  if (c == BACKSPACE) {
+    uartputc('\b'); uartputc(' '); uartputc('\b');
+  } else
+    uartputc(c);
+  cgaputc_color(c, fg, bg);
+}
+
+void
 consputc(int c)
 {
   if (panicked) {
@@ -288,6 +336,13 @@ consoleread(struct file *f, char *dst, int n)
 int
 consoleioctl(struct file *f, int param, int value)
 {
+  switch (param) {
+    case 0: // set color for fd
+      f->dev_payload = (char)value << 8;
+      return 0;
+    case 1: //set global color
+      return 0;
+  }
   cprintf("Got unknown console ioctl request. %d = %d\n",param,value);
   return -1;
 }
@@ -299,7 +354,7 @@ consolewrite(struct file *f, char *buf, int n)
 
   acquire(&cons.lock);
   for(i = 0; i < n; i++)
-    consputc(buf[i] & 0xff);
+    consputc_color(buf[i] & 0xff, (f->dev_payload >> 8) & 0xFF, f->dev_payload & 0xFF);
   release(&cons.lock);
 
   return n;
