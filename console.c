@@ -24,6 +24,7 @@ static int panicked = 0;
 static struct {
   struct spinlock lock;
   int locking;
+  uint32 global_color;
 } cons;
 
 static char digits[] = "0123456789abcdef";
@@ -152,6 +153,12 @@ static void
 cgaputc(int c)
 {
   int pos;
+  unsigned char global_color;
+
+  if (cons.locking)
+    global_color = cons.global_color >> 8;
+  else
+    global_color = 0x07;
 
   // Cursor position: col + 80*row.
   outb(CRTPORT, 14);
@@ -164,7 +171,7 @@ cgaputc(int c)
   else if (c == BACKSPACE) {
     if (pos > 0) --pos;
   } else
-    crt[pos++] = (c&0xff) | 0x0700;  // gray on black
+    crt[pos++] = (c&0xff) | global_color << 8;  // use global color
 
   if ((pos/80) >= 24){  // Scroll up.
     memmove(crt, crt+80, sizeof(crt[0])*23*80);
@@ -176,7 +183,7 @@ cgaputc(int c)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | 0x0700;
+  crt[pos] = ' ' | global_color << 8;
 }
 
 static void
@@ -208,7 +215,7 @@ cgaputc_color(int c, unsigned char fg, unsigned char bg)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | 0x0700;
+  crt[pos] = ' ' | fg << 8 | bg;
 }
 
 void
@@ -341,6 +348,9 @@ consoleioctl(struct file *f, int param, int value)
       f->dev_payload = (char)value << 8;
       return 0;
     case 1: //set global color
+      acquire(&cons.lock);
+      cons.global_color = (char)value << 8;
+      release(&cons.lock);
       return 0;
   }
   cprintf("Got unknown console ioctl request. %d = %d\n",param,value);
@@ -365,6 +375,7 @@ consoleinit(void)
 {
   initlock(&cons.lock, "console");
   initlock(&input.lock, "input");
+  cons.global_color = 0x0700; // default color
 
   devsw[CONSOLE].write = consolewrite;
   devsw[CONSOLE].read = consoleread;
