@@ -1,5 +1,6 @@
 #include "types.h"
 #include "defs.h"
+#include "display.h"
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
@@ -27,6 +28,7 @@ main(void)
   cprintf("\ncpu%d: starting Fall 2021 xv6\n\n", cpunum());
   ioapicinit();    // another interrupt controller
   consoleinit();   // console hardware
+  displayinit();   // display hardware
   uartinit();      // serial port
   pinit();         // process table
   binit();         // buffer cache

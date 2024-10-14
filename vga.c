@@ -382,6 +382,9 @@ void cgaRestorePalette()
 {
   // restore the saved cga palette with vgaSetPalette
   // TODO: Your code here:
+  for (int i = 0; i < 256; i++) {
+    vgaSetPalette(i, cga256[i] >> 18 & 0xFF, cga256[i] >> 10 & 0xFF, cga256[i] >> 2 & 0xFF);
+  }
 }
 
 void vgaMode13() {
