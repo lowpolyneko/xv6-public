@@ -122,8 +122,8 @@ UPROGS= \
 	_rm _sh _stressfs _usertests _wc _zombie _prettyprint _imshow\
 #
 
-fs.img: mkfs README cover.raw $(UPROGS)
-	./mkfs fs.img README cover.raw $(UPROGS)
+fs.img: mkfs README frieren.raw $(UPROGS)
+	./mkfs fs.img README frieren.raw $(UPROGS)
 
 clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \

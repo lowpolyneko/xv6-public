@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
   }
 
   int img;
-  if( (img = open("cover.raw",0)) == 0) {
+  if( (img = open("frieren.raw",0)) == 0) {
     exit();
   }
 
