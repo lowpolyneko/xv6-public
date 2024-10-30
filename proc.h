@@ -63,7 +63,7 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   // mmap
-  char* mmaptop;
+  void *mmaptop;
   int mmapcount; // number of mmaps recorded below
   struct {
     int fd;

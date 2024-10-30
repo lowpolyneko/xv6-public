@@ -9,6 +9,7 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "file.h"
+#include "stat.h"
 
 int
 sys_fork(void)
@@ -97,11 +98,61 @@ sys_uptime(void)
 sys_mmap(void)
 {
   int fd, flags;
+  addr_t allocation, a, new_top;
+  void *mem;
+  struct file *file;
+  struct stat s;
+
   if(argint(0,&fd) < 0 || argint(1,&flags) < 0)
     return MMAP_FAILED;
 
-  // TODO: your implementation
-  return MMAP_FAILED;
+  // get fd
+  if (fd < 0 || fd > 9)
+    return MMAP_FAILED; // bad fd
+
+  file = proc->ofile[fd];
+  if (filestat(file, &s) < 0) // get size
+    return MMAP_FAILED; // bad fd
+
+  allocation = (addr_t)proc->mmaptop;
+  new_top = PGROUNDUP(allocation + s.size);
+
+  // set metadata
+  proc->mmaps[proc->mmapcount].fd = fd;
+  proc->mmaps[proc->mmapcount++].start = allocation;
+  proc->mmaptop = (void *)new_top;
+
+  if (flags)
+    return allocation; // lazy allocation
+
+  // eagerly allocate pages
+  for (a = allocation; a < new_top; a += PGSIZE) {
+    mem = kalloc();
+    if (!mem) {
+      // failed to alloc
+      // TODO handle properly
+      /*proc->mmaptop = (void *)old_top;*/
+      /*--proc->mmapcount;*/
+      /*return MMAP_FAILED;*/
+      panic("failed to kalloc for mmap");
+    }
+    memset(mem, 0, PGSIZE);
+    if(mappages(proc->pgdir, (void *)a, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0) {
+      // ran out of memory
+      // TODO fix memleaks from prior allocations
+      /*kfree(mem);*/
+      /*return MMAP_FAILED;*/
+      panic("failed to map page");
+    }
+  }
+
+  // flush tlb
+  /*lcr3(V2P(proc->pgdir));*/
+
+  // read file
+  fileread(file, uva2ka(proc->pgdir, (void *)allocation), s.size);
+
+  return allocation;
 }
 
   int
