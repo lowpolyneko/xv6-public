@@ -118,8 +118,11 @@ sys_mmap(void)
   new_top = PGROUNDUP(allocation + s.size);
 
   // set metadata
-  proc->mmaps[proc->mmapcount].fd = fd;
-  proc->mmaps[proc->mmapcount++].start = allocation;
+  if (proc->mmapcount > 9)
+    return MMAP_FAILED; // no more allocs
+
+  proc->mmaps[++proc->mmapcount - 1].fd = fd;
+  proc->mmaps[proc->mmapcount - 1].start = allocation;
   proc->mmaptop = (void *)new_top;
 
   if (flags)
@@ -130,27 +133,19 @@ sys_mmap(void)
     mem = kalloc();
     if (!mem) {
       // failed to alloc
-      // TODO handle properly
-      /*proc->mmaptop = (void *)old_top;*/
-      /*--proc->mmapcount;*/
-      /*return MMAP_FAILED;*/
       panic("failed to kalloc for mmap");
     }
     memset(mem, 0, PGSIZE);
     if(mappages(proc->pgdir, (void *)a, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0) {
       // ran out of memory
-      // TODO fix memleaks from prior allocations
-      /*kfree(mem);*/
-      /*return MMAP_FAILED;*/
       panic("failed to map page");
     }
+
+    // read file
+    ilock(file->ip);
+    readi(file->ip, mem, a - allocation, PGSIZE);
+    iunlock(file->ip);
   }
-
-  // flush tlb
-  /*lcr3(V2P(proc->pgdir));*/
-
-  // read file
-  fileread(file, uva2ka(proc->pgdir, (void *)allocation), s.size);
 
   return allocation;
 }
@@ -168,7 +163,10 @@ handle_pagefault(addr_t va)
   if (page_addr >= (addr_t)proc->mmaptop || page_addr < MMAPBASE)
     return 0; // can't be a valid mmap
 
-  // find file descriptor
+  // find file descriptor and start addr
+  if (proc->mmapcount < 1)
+    return 0; // no mmaps
+
   for (i = 0; i < proc->mmapcount; ++i) {
     if (proc->mmaps[i].start > page_addr)
       break; // found the mmap after this one
@@ -179,6 +177,9 @@ handle_pagefault(addr_t va)
 
   // allocate page
   mem = kalloc();
+  if (!mem)
+    return 0; // failed to alloc
+
   memset(mem, 0, PGSIZE);
 
   if(mappages(proc->pgdir, (void *)page_addr, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0)
