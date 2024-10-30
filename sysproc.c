@@ -158,6 +158,37 @@ sys_mmap(void)
   int
 handle_pagefault(addr_t va)
 {
-  // TODO: your code here
-  return 0;
+  addr_t page_addr, allocation;
+  void *mem;
+  struct file *file;
+  int i, fd;
+
+  // find page reference
+  page_addr = PGROUNDDOWN(va);
+  if (page_addr >= (addr_t)proc->mmaptop || page_addr < MMAPBASE)
+    return 0; // can't be a valid mmap
+
+  // find file descriptor
+  for (i = 0; i < proc->mmapcount; ++i) {
+    if (proc->mmaps[i].start > page_addr)
+      break; // found the mmap after this one
+
+    allocation = proc->mmaps[i].start;
+    fd = proc->mmaps[i].fd;
+  }
+
+  // allocate page
+  mem = kalloc();
+  memset(mem, 0, PGSIZE);
+
+  if(mappages(proc->pgdir, (void *)page_addr, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0)
+    panic("failed to map mmap page");
+
+  // write page
+  file = proc->ofile[fd];
+  ilock(file->ip);
+  readi(file->ip, mem, page_addr - allocation, PGSIZE);
+  iunlock(file->ip);
+
+  return 1;
 }
