@@ -472,10 +472,10 @@ copyout(pde_t *pgdir, addr_t va, void *p, uint64 len)
 void
 dedup(void *vstart, void *vend)
 {
+  pte_t *pte_i, *pte_j;
   addr_t ps = PGROUNDDOWN((addr_t)vstart);
   addr_t pe = PGROUNDDOWN((addr_t)vend);
   addr_t i, j;
-  pte_t *pte_i, *pte_j;
 
   // skip zero page
   if (ps == 0)
@@ -498,7 +498,8 @@ dedup(void *vstart, void *vend)
       if (*pte_i != *pte_j && frames_are_identical(PTE_ADDR(*pte_i), PTE_ADDR(*pte_j))) {
         // identical, set j to point to i
         krelease(P2V(PTE_ADDR(*pte_j)));
-        *pte_j = PTE_ADDR(*pte_i) | PTE_P | PTE_U; // no PTE_W on purpose
+        *pte_j = PTE_ADDR(*pte_i) | PTE_COW | PTE_U | PTE_P; // no PTE_W on purpose
+        kretain(P2V(PTE_ADDR(*pte_i)));
         /*cprintf("%p same as %p, setting pa of 2nd to %p\n", i, j, PTE_ADDR(*pte_i));*/
       }
     }
@@ -512,6 +513,22 @@ dedup(void *vstart, void *vend)
 int
 copyonwrite(char* v)
 {
-  cprintf("didn't copyonwrite anything\n");
-  return 0;
+  addr_t pg = PGROUNDDOWN((addr_t)v);
+  void *mem;
+  pte_t *pte;
+
+  pte = walkpgdir(proc->pgdir, (void *)pg, 1);
+  if (!pte || !(PTE_FLAGS(*pte) & PTE_COW))
+    return 0; // not COW page
+
+  // alloc page
+  mem = kalloc();
+  if (!mem)
+    return 0; // failed alloc
+
+  memmove(mem, P2V(PTE_ADDR(*pte)), PGSIZE);
+  krelease(P2V(PTE_ADDR(*pte)));
+  *pte = V2P(mem) | PTE_U | PTE_W | PTE_P; // no PTE_W on purpose
+
+  return 1;
 }
