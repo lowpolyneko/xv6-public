@@ -498,7 +498,8 @@ dedup(void *vstart, void *vend)
       if (*pte_i != *pte_j && frames_are_identical(PTE_ADDR(*pte_i), PTE_ADDR(*pte_j))) {
         // identical, set j to point to i
         krelease(P2V(PTE_ADDR(*pte_j)));
-        *pte_j = PTE_ADDR(*pte_i) | PTE_COW | PTE_U | PTE_P; // no PTE_W on purpose
+        *pte_i = PTE_ADDR(*pte_i) | PTE_COW | PTE_U | PTE_P; // make both COW references
+        *pte_j = *pte_i; // no PTE_W on purpose
         kretain(P2V(PTE_ADDR(*pte_i)));
         /*cprintf("%p same as %p, setting pa of 2nd to %p\n", i, j, PTE_ADDR(*pte_i));*/
       }
