@@ -472,7 +472,38 @@ copyout(pde_t *pgdir, addr_t va, void *p, uint64 len)
 void
 dedup(void *vstart, void *vend)
 {
-  cprintf("didn't dedup anything\n");
+  addr_t ps = PGROUNDDOWN((addr_t)vstart);
+  addr_t pe = PGROUNDDOWN((addr_t)vend);
+  addr_t i, j;
+  pte_t *pte_i, *pte_j;
+
+  // skip zero page
+  if (ps == 0)
+    ps += PGSIZE;
+
+  // compute checksums
+  for (i = ps; i < pe; i += PGSIZE) {
+    pte_i = walkpgdir(proc->pgdir, (void *)i, 0);
+    update_checksum(PTE_ADDR(*pte_i));
+    /*cprintf("update checksum of %p, %p\n", i, PTE_ADDR(*pte_i));*/
+  }
+
+  // check frames that need to be deduped
+  /*cprintf("dedup frames\n");*/
+  for (i = ps; i < pe; i += PGSIZE) {
+    for (j = i + PGSIZE; j < pe; j += PGSIZE) {
+      pte_i = walkpgdir(proc->pgdir, (void *)i, 0);
+      pte_j = walkpgdir(proc->pgdir, (void *)j, 0);
+
+      if (*pte_i != *pte_j && frames_are_identical(PTE_ADDR(*pte_i), PTE_ADDR(*pte_j))) {
+        // identical, set j to point to i
+        krelease(P2V(PTE_ADDR(*pte_j)));
+        *pte_j = PTE_ADDR(*pte_i) | PTE_P | PTE_U; // no PTE_W on purpose
+        /*cprintf("%p same as %p, setting pa of 2nd to %p\n", i, j, PTE_ADDR(*pte_i));*/
+      }
+    }
+  }
+
   return;
 }
 
